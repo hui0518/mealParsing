@@ -1,4 +1,6 @@
 <?php 
+include('simple_html_dom.php');
+
 $schulCode = 'B100000570'; //학교 코드 (기본값: 한성과학고)
 $countryCode = 'stu.sen.go.kr'; //지역 교육청 나이스 url
 $schulCrseScCode = '4'; //학교 분류
@@ -27,50 +29,76 @@ function calendar($i) {
 }
 
 // i일 후 급식 파싱
-function meal($i, $mealcode) {
-    $schYmd = date("Y.m.d", mktime(0,0,0,date("m"),date("d")+$i,date("Y")));
+function meal($i, $mealcode){
+    
+    //parameter의 값을 숫자로 변환한다.
     switch ($mealcode) {
-        case '1': $meal = '조식';break;
-        case '2': $meal = '중식';break;
-        case '3': $meal = '석식';break;
+        case '1' : $meal = '조식';
+            break;
+        case '2' : $meal = '중식';
+            break;
+        case '3' : $meal = '석식';
+            break;
     }
-
-    $food_url='http://'.$countryCode.'/sts_sci_md01_001.do?schulCode='.$schulCode.'&schulCrseScCode='.$schulCrseScCode.'&schMmealScCode='.$mealcode.'&schYmd='.$schYmd;
+    
+    $schYmd = date("Y.m.d", mktime(0,0,0,date("m")  , date("d")+$i, date("Y"))); //오늘 날짜
+    $food_url = 'http://stu.sen.go.kr/sts_sci_md01_001.do?schulCode=B100000570&schulCrseScCode=4&schMmealScCode='.$mealcode.'&schYmd='.$schYmd;
     
     while (strlen($text)==0) {
-      $text=@file_get_contents($food_url);
+      $text = @file_get_html($food_url);
     }
-
-    $temp=@explode('<table',$text);
-    $a=@explode('<thead>',$temp[1]);
-    $b=@explode('<tr>',$a[1]);
-    $r=@explode('</th>',$b[1]);
-    $sun=@explode('<th scope="col" class="point2">',$r[1]);
-    $mon=@explode('<th scope="col">',$r[2]);
-    $tus=@explode('<th scope="col">',$r[3]);
-    $wed=@explode('<th scope="col">',$r[4]);
-    $thu=@explode('<th scope="col">',$r[5]);
-    $fri=@explode('<th scope="col">',$r[6]);
-    $sat=@explode('<th scope="col" class="last point1">',$r[7]);
-    $index=0;
-    if ($sun[1]==$schYmd . '(일)') {$index=0;$day='일';}
-    elseif ($mon[1]==$schYmd.'(월)') {$index=1;$day='월';}
-    elseif ($tus[1]==$schYmd.'(화)') {$index=2;$day='화';}
-    elseif ($wed[1]==$schYmd.'(수)') {$index=3;$day='수';}
-    elseif ($thu[1]==$schYmd.'(목)') {$index=4;$day='목';}
-    elseif ($fri[1]==$schYmd.'(금)') {$index=5;$day='금';}
-    elseif ($sat[1]==$schYmd.'(토)') {$index=6;$day='토';}
-    else{echo'오류가 발생했습니다.';}
-
-    $temp=@explode('<table',$text);
-    $a=@explode('<tbody>',$temp[1]);
-    $b=@explode('<tr>',$a[1]);
-    $r=@explode('</td>',$b[2]);
-    $c=@explode('<td class="textC">',$r[$index]);
-    if (strlen($c[1]) < 2) {
-      echo'급식이 없습니다.';
+    
+    $sun =$text->find('th', 1)->innertext;
+    $mon=$text->find('th', 2)->innertext;
+    $tus=$text->find('th', 3)->innertext;
+    $wed=$text->find('th', 4)->innertext;
+    $thu=$text->find('th', 5)->innertext;
+    $fri=$text->find('th', 6)->innertext;
+    $sat=$text->find('th', 7)->innertext;
+    
+    
+    if ($sun==$schYmd . '(일)'){
+        $index = 7;
+        $day = '일';
+    }else if($mon==$schYmd . '(월)'){
+        $index = 8;
+        $day = '월';
+    }else if($tus==$schYmd . '(화)'){
+        $index = 9;
+        $day = '화';
+    }else if($wed==$schYmd . '(수)'){
+        $index = 10;
+        $day = '수';
+    }else if($thu==$schYmd . '(목)'){
+        $index = 11;
+        $day = '목';
+    }else if($fri==$schYmd . '(금)'){
+        $index = 12;
+        $day = '금';
+    }else if($sat==$schYmd . '(토)'){
+        $index = 13;
+        $day = '토';
+    }
+    
+    $str =$text->find('td', $index)->innertext;
+    $str = str_replace('<br />', '
+                       ', $str);
+    
+    if (strlen($str) == 0) {
+        $array1 = array("text" => $schYmd . ' (' . $day.') '. $meal);
+        $array3 = array("text" => '급식이 없습니다.');
+        $array4 = array($array1, $array3);
+        $array5 = array("messages" => $array4);
+        $json = @json_encode($array5);
+        echo $json;
     }else{
-      echo $c[1];
-    }
+        $array1 = array("text" => $schYmd . ' (' . $day.') '. $meal);
+        $array3 = array("text" => $str);
+        $array4 = array($array1, $array3);
+        $array5 = array("messages" => $array4);
+        $json = @json_encode($array5);
+        $json = preg_replace("/\s+/", "", $json);
+        echo $json;
+    };
 }
 ?>
